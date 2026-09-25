@@ -210,3 +210,7 @@ if (COMMANDS[command]) {
   console.log('  node cli.js export --format=csv --out=out.csv');
   console.log('  node cli.js selftest');
 }
+
+// 释放可能启动的浏览器，避免进程被 Chromium 挂住
+const { closeBrowser } = await import('./src/util/browser.js');
+await closeBrowser();

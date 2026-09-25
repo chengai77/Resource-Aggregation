@@ -218,6 +218,7 @@ select { padding: 7px 8px; border: 2px solid var(--line); background: #fbfcfd; }
 }
 .edit-grid textarea { min-height: 62px; resize: vertical; }
 .edit-row { display: flex; gap: 8px; align-items: center; }
+.browser-verify-row { flex-wrap: wrap; padding: 6px 8px; background: var(--accent-soft); border: 1px solid var(--accent-line); }
 .edit-row .btn { flex: 0 0 auto; }
 
 .dup-list { border: 2px dashed var(--line); padding: 7px; font-size: 12.5px; }

@@ -8,6 +8,7 @@ import { log } from '../util/log.js';
 import { maskedSettings, saveSettings } from '../config.js';
 import { parseQuery, queryFacets, queryItems } from './query.js';
 import { toCsv, toMarkdown } from './export.js';
+import { browserFetch, browserStatus } from '../util/browser.js';
 
 /** 异步处理包装，异常交给统一错误中间件 */
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -101,19 +102,36 @@ export function createRouter() {
     res.json({ logs: log.recent(Number(req.query.limit) || 120) });
   });
 
-  router.get('/settings', (req, res) => {
-    res.json(maskedSettings());
-  });
+  router.get('/settings', wrap(async (req, res) => {
+    res.json({ ...maskedSettings(), browser: await browserStatus() });
+  }));
 
-  router.post('/settings', (req, res) => {
+  /** 打开 Planet Minecraft 首页，供用户在可见浏览器中手动完成验证 */
+  router.post('/browser/verify/planetminecraft', wrap(async (req, res) => {
+    const settings = maskedSettings();
+    const browser = await browserStatus();
+    if (!settings.browserMode) return res.status(409).json({ error: '请先在设置中开启浏览器模式' });
+    if (!browser.installed) return res.status(503).json({ error: browser.hint || '浏览器运行时不可用' });
+    if (browser.verification?.running) return res.status(409).json({ error: '已有人工验证窗口正在运行' });
+    const url = 'https://www.planetminecraft.com/';
+    // 后台打开可见浏览器；接口立即返回，前端通过状态接口显示人工验证进度。
+    browserFetch(url, { timeout: 180000, scroll: false }).catch((err) => log.error('browser', `人工验证流程失败：${err.message}`));
+    return res.status(202).json({ ok: true, started: true, url });
+  }));
+
+  router.get('/browser/status', wrap(async (req, res) => {
+    res.json(await browserStatus());
+  }));
+
+  router.post('/settings', wrap(async (req, res) => {
     const patch = { ...(req.body || {}) };
     // 空值与展示占位值均表示保留原凭据
     for (const key of ['curseforgeApiKey', 'klpbbsCookie']) {
       if (patch[key] === undefined || patch[key] === '' || patch[key] === '已配置' || patch[key] === '未配置') delete patch[key];
     }
     saveSettings(patch);
-    res.json(maskedSettings());
-  });
+    res.json({ ...maskedSettings(), browser: await browserStatus() });
+  }));
 
   router.get('/export', (req, res) => {
     const params = { ...parseQuery(req.query), dup: 'all', page: 1, limit: 100000 };

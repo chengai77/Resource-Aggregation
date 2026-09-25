@@ -5,6 +5,15 @@ import { emit } from './state.js';
 
 let pollTimer = null;
 
+function browserStatusText(browser = {}) {
+  if (!browser.installed) return '未检测到 Playwright 浏览器运行时，请先安装 Chromium。';
+  const verification = browser.verification || {};
+  if (verification.running) return '验证窗口已打开，请在窗口内完成 Planet Minecraft 验证。';
+  if (verification.state === 'verified') return '最近一次人工验证已完成，可以开始采集。';
+  if (verification.state === 'error') return `上次验证失败：${verification.error || '未知错误'}`;
+  return '开启后可打开可见浏览器，由你手动完成验证。';
+}
+
 /** 采集表单 */
 function buildCollectForm(sources) {
   const sourceBoxes = sources.map((src) => {
@@ -155,16 +164,49 @@ export async function openSettings() {
   const browser = el('input', { type: 'checkbox' });
   browser.checked = Boolean(settings.browserMode);
   const interval = el('input', { type: 'number', value: String(settings.requestIntervalMs || 1200), min: '300' });
+  const browserInterval = el('input', { type: 'number', value: String(settings.browserIntervalMs || 5000), min: '1000' });
   const maxItems = el('input', { type: 'number', value: String(settings.maxItems || 50000), min: '1000' });
+  const browserState = el('div', { class: 'hint', text: browserStatusText(settings.browser) });
+  const verify = el('button', { class: 'btn small', type: 'button', text: '打开验证窗口' });
+  verify.disabled = !settings.browserMode || settings.browser?.installed === false;
 
   const form = el('form', { class: 'form-grid' }, [
     field('CurseForge API Key', key, '第三方使用者需向 Overwolf 提交申请表单获取，非自助注册'),
-    field('苦力怕论坛 Cookie', cookie, '登录后从浏览器开发者工具复制，用于关键词搜索'),
+    field('苦力怕论坛 Cookie', cookie, '登录后从浏览器开发者工具复制'),
     field('请求间隔（毫秒）', interval, '同源最小请求间隔，过低易被限流'),
+    field('浏览器请求间隔（毫秒）', browserInterval, '浏览器模式间隔，过低易触发站点防护'),
     field('库存上限', maxItems, '超出后淘汰最旧的未编辑条目'),
     el('label', { class: 'edit-row' }, [browser, '启用浏览器抓取模式（需安装 playwright）']),
+    el('div', { class: 'edit-row browser-verify-row' }, [verify, browserState]),
     el('div', { class: 'edit-row' }, [el('button', { class: 'btn primary', type: 'submit', text: '保存' })]),
   ]);
+
+  verify.addEventListener('click', async () => {
+    verify.disabled = true;
+    browserState.textContent = '正在打开可见浏览器，请在窗口内手动完成验证…';
+    try {
+      await api.verifyPlanetMinecraft();
+      const poll = async () => {
+        try {
+          const status = await api.browserStatus();
+          browserState.textContent = browserStatusText(status);
+          if (status.verification?.running) return setTimeout(poll, 1500);
+          verify.disabled = !browser.checked || status.installed === false;
+        } catch (err) {
+          browserState.textContent = `状态读取失败：${err.message}`;
+          verify.disabled = false;
+        }
+      };
+      poll();
+    } catch (err) {
+      browserState.textContent = err.message;
+      verify.disabled = false;
+    }
+  });
+
+  browser.addEventListener('change', () => {
+    verify.disabled = !browser.checked || settings.browser?.installed === false;
+  });
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -174,6 +216,7 @@ export async function openSettings() {
         klpbbsCookie: cookie.value.trim(),
         browserMode: browser.checked,
         requestIntervalMs: Number(interval.value) || 1200,
+        browserIntervalMs: Number(browserInterval.value) || 5000,
         maxItems: Number(maxItems.value) || 50000,
       });
       toast('设置已保存');

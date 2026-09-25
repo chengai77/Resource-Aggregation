@@ -3,6 +3,7 @@ import express from 'express';
 import { HOST, PORT, PUBLIC_DIR, loadSettings } from '../config.js';
 import { store } from '../store/store.js';
 import { createRouter } from './routes.js';
+import { closeBrowser } from '../util/browser.js';
 import { log } from '../util/log.js';
 
 export function createApp() {
@@ -35,10 +36,11 @@ export function startServer() {
     log.info('server', `已启动：http://${HOST}:${PORT}`);
   });
 
-  // 退出前落盘，避免数据丢失
+  // 退出前落盘并关闭浏览器，避免数据丢失与残留进程
   const shutdown = (signal) => {
     log.info('server', `收到 ${signal}，正在保存并退出`);
     store.flushNow();
+    closeBrowser();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 1500).unref();
   };

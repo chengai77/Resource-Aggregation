@@ -52,11 +52,14 @@ node cli.js selftest
 | 源 | 类型 | 接入方式 | 凭据 |
 | --- | --- | --- | --- |
 | Modrinth | 数据包 | 官方 API v2 | 不需要 |
+| MinecraftMaps | 地图 | 可见浏览器模式 | 站点有 Cloudflare 防护，必须低频 |
 | 苦力怕论坛（klpbbs） | 地图、附加包 | 直连 Discuz，详情页补全 | 不需要，可选 Cookie |
 | Planet Minecraft | 地图、数据包 | 可见浏览器模式复用 Cookie | 人工过一次人机验证 |
 | CurseForge | 地图、数据包、整合包、资源包 | 官方 API v1 | 需要 API Key |
 
-Planet Minecraft 受 Cloudflare 托管校验保护，首次使用需在「设置」中开启浏览器抓取模式，弹出的窗口里手动完成一次验证，之后的请求复用该 Cookie。
+Planet Minecraft 受 Cloudflare 托管校验保护。注意：HTTP 200 也可能是挑战页，不能仅凭状态码判断成功；程序会识别 `__cf_chl_`、`cf-turnstile`、`/cdn-cgi/challenge-platform/` 等标记。首次使用需在「设置」中开启浏览器抓取模式，然后点击「打开验证窗口」。程序会打开可见浏览器并等待用户手动完成验证；验证完成后再从「采集」面板选择 Planet Minecraft 抓取地图或数据包文章。程序只保存该浏览器上下文的本地状态，不复制、伪造或注入 `cf_clearance`。
+
+MinecraftMaps 同样受 Cloudflare 保护，且防护更严格：请求间隔过密会直接返回 `Error 1006`（IP 级拒绝访问），此时内置 Chromium 与普通浏览器都会一并被拦。程序识别到拦截页后会暂停该源十分钟，仅靠延长间隔通常无法立即恢复，建议把它作为低频补充源使用。
 
 CurseForge 的 Key 需向 Overwolf 提交[申请表单](https://forms.monday.com/forms/dce5ccb7afda9a1c21dab1a1aa1d84eb?r=use1)获取，通过后填入「设置」即自动启用。
 
@@ -65,6 +68,7 @@ CurseForge 的 Key 需向 Overwolf 提交[申请表单](https://forms.monday.com
 | 配置 | 默认值 | 说明 |
 | --- | --- | --- |
 | `browserMode` | `false` | 启用可见浏览器抓取需校验的站点 |
+| `browserIntervalMs` | `5000` | 浏览器模式最小请求间隔，过低易触发站点防护 |
 | `requestIntervalMs` | `1200` | 同一站点最小请求间隔 |
 | `maxItems` | `50000` | 条目上限，超出后淘汰最旧，已编辑与收藏受保护 |
 | `curseforgeApiKey` | 空 | CurseForge API Key |
@@ -88,6 +92,8 @@ CurseForge 的 Key 需向 Overwolf 提交[申请表单](https://forms.monday.com
 | POST | `/api/dedupe` | 手动重跑去重 |
 | GET | `/api/export` | 导出，`format=csv\|md\|json` |
 | GET/POST | `/api/settings` | 读取或保存设置 |
+| POST | `/api/browser/verify/planetminecraft` | 打开可见浏览器，等待用户手动完成 Planet Minecraft 验证 |
+| GET | `/api/browser/status` | 查看人工验证窗口状态 |
 | GET | `/api/logs` | 运行日志 |
 
 ## 目录结构
@@ -98,12 +104,12 @@ cli.js                 命令行：collect / stats / export / selftest
 src/
   config.js            路径、端口与可持久化设置
   collector.js         采集编排：逐源 search → enrich → 入库 → 去重
-  sources/             源适配器（base、modrinth、klpbbs、planetminecraft、curseforge）
+  sources/             源适配器（base、modrinth、klpbbs、planetminecraft、minecraftmaps、curseforge）
   store/               store 存储与 dedupe 去重
   server/              app 静态与错误出口、routes 路由、query 查询、export 导出
   util/                http 限速重试缓存、robots、browser 浏览器抓取、richtext、log
 public/                前端：index.html、css、js（api、ui、state、filters、cards、detail、collect、app）
-data/                  运行时数据（items.json、settings.json、browser-profile）
+data/                  运行时数据（items.json、settings.json、browser-state.json）
 ```
 
 ## 设计要点
@@ -124,6 +130,7 @@ data/                  运行时数据（items.json、settings.json、browser-pr
 ## 已知限制
 
 - Planet Minecraft 首次采集需要人工过一次人机验证，Cookie 失效后需重新验证
+- MinecraftMaps 需开启浏览器模式，且站点可能对本机 IP 返回 `Error 1006` 硬拦截，此时该源本轮会被跳过；详情正文的容器选择器尚未在真实页面校准，概述暂取自站点元信息
 - 苦力怕论坛的 `/search.php` 被其 robots.txt 明确禁止抓取，因此不提供站内关键词搜索：按板块翻页采集入库后，用本工具前端的本地搜索即可
 - CurseForge 未配置 API Key 时该源会被跳过
 - 苦力怕论坛部分帖子未上传图片，这类条目的封面为空属正常情况

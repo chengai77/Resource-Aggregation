@@ -33,5 +33,7 @@ export const api = {
   logs: (limit = 60) => request(`/logs?limit=${limit}`),
   settings: () => request('/settings'),
   saveSettings: (patch) => request('/settings', { method: 'POST', body: patch }),
+  verifyPlanetMinecraft: () => request('/browser/verify/planetminecraft', { method: 'POST', body: {} }),
+  browserStatus: () => request('/browser/status'),
   exportUrl: (format, params) => `${BASE}/export?${new URLSearchParams({ ...params, format })}`,
 };

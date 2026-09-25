@@ -17,6 +17,7 @@ const DEFAULTS = {
   curseforgeApiKey: '',
   klpbbsCookie: '', // 苦力怕论坛登录 Cookie，用于关键词搜索
   browserMode: false, // 启用可见浏览器抓取 Cloudflare 站点
+  browserIntervalMs: 5000, // 浏览器模式最小请求间隔，过低易触发站点防护
   requestIntervalMs: 1200, // 同源最小请求间隔
   maxItems: 50000, // 条目上限，超出淘汰最旧
 };

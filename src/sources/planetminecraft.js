@@ -2,7 +2,7 @@
 import * as cheerio from 'cheerio';
 import { Fetcher, HttpError } from '../util/http.js';
 import { makeItem, SourceAdapter } from './base.js';
-import { browserFetch, isBrowserAvailable } from '../util/browser.js';
+import { browserFetch, isBrowserAvailable, looksLikeChallengePage } from '../util/browser.js';
 import { getSettings } from '../config.js';
 import { clampText } from '../util/text.js';
 import { stripHtml, pickGameplay } from '../util/richtext.js';
@@ -60,20 +60,26 @@ class PlanetMinecraftAdapter extends SourceAdapter {
     return ok ? { ready: true } : { ready: false, reason: '浏览器模式已开启但 playwright 不可用' };
   }
 
-  /** 直连优先，被拦截时切换浏览器 */
+  /**
+   * 直连优先，被拦截或返回挑战 HTML 时切换到可见浏览器。
+   * 不复制 cf_clearance，也不伪造挑战请求；浏览器模式只复用本地人工完成的会话状态。
+   */
   async #html(url) {
     try {
-      return await this.http.text(url, { ttl: 300000 });
+      const html = await this.http.text(url, { ttl: 300000 });
+      if (!looksLikeChallengePage(html)) return html;
+      throw new Error('检测到 Cloudflare 挑战页面（HTTP 200）');
     } catch (err) {
       const blocked = err instanceof HttpError && [403, 429, 503].includes(err.status);
-      if (!blocked) throw err;
+      const challenge = blocked || /挑战页面|challenge/i.test(err.message || '');
+      if (!challenge) throw err;
       if (!getSettings().browserMode) {
-        throw new Error('站点触发了人机验证，请在「设置」中启用浏览器抓取模式后重试');
+        throw new Error('站点返回 Cloudflare 人机验证，未启用浏览器模式；请使用公开 API、人工来源跳转，或在设置中开启可见浏览器模式');
       }
       if (!(await isBrowserAvailable())) {
-        throw new Error('浏览器模式已启用，但 playwright 未安装，请运行：npx playwright install chromium');
+        throw new Error('浏览器模式已启用，但 playwright 不可用；请先安装浏览器运行时');
       }
-      log.info(this.id, '直连被拦截，改用浏览器抓取（首次可能需在窗口内完成验证）');
+      log.info(this.id, '检测到 Cloudflare 验证，改用可见浏览器等待人工完成（不绕过验证）');
       return browserFetch(url, { timeout: 120000 });
     }
   }
