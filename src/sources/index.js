@@ -2,9 +2,10 @@
 import { modrinthAdapter } from './modrinth.js';
 import { planetMinecraftAdapter } from './planetminecraft.js';
 import { klpbbsAdapter } from './klpbbs.js';
+import { minecraftMapsAdapter } from './minecraftmaps.js';
 import { curseForgeAdapter } from './curseforge.js';
 
-const ADAPTERS = [modrinthAdapter, planetMinecraftAdapter, klpbbsAdapter, curseForgeAdapter];
+const ADAPTERS = [modrinthAdapter, planetMinecraftAdapter, minecraftMapsAdapter, klpbbsAdapter, curseForgeAdapter];
 const registry = new Map(ADAPTERS.map((adapter) => [adapter.id, adapter]));
 
 /** 全部适配器 */
