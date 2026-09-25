@@ -151,6 +151,7 @@ export async function openSettings() {
   }
 
   const key = el('input', { type: 'text', value: settings.curseforgeApiKey || '', placeholder: '未配置时该源自动跳过' });
+  const cookie = el('input', { type: 'text', value: settings.klpbbsCookie || '', placeholder: '未配置时仅按板块翻页' });
   const browser = el('input', { type: 'checkbox' });
   browser.checked = Boolean(settings.browserMode);
   const interval = el('input', { type: 'number', value: String(settings.requestIntervalMs || 1200), min: '300' });
@@ -158,6 +159,7 @@ export async function openSettings() {
 
   const form = el('form', { class: 'form-grid' }, [
     field('CurseForge API Key', key, '第三方使用者需向 Overwolf 提交申请表单获取，非自助注册'),
+    field('苦力怕论坛 Cookie', cookie, '登录后从浏览器开发者工具复制，用于关键词搜索'),
     field('请求间隔（毫秒）', interval, '同源最小请求间隔，过低易被限流'),
     field('库存上限', maxItems, '超出后淘汰最旧的未编辑条目'),
     el('label', { class: 'edit-row' }, [browser, '启用浏览器抓取模式（需安装 playwright）']),
@@ -169,6 +171,7 @@ export async function openSettings() {
     try {
       await api.saveSettings({
         curseforgeApiKey: key.value.trim(),
+        klpbbsCookie: cookie.value.trim(),
         browserMode: browser.checked,
         requestIntervalMs: Number(interval.value) || 1200,
         maxItems: Number(maxItems.value) || 50000,

@@ -4,6 +4,7 @@ import { Fetcher } from '../util/http.js';
 import { makeItem, SourceAdapter } from './base.js';
 import { clampText } from '../util/text.js';
 import { stripHtml, pickGameplay } from '../util/richtext.js';
+import { getSettings } from '../config.js';
 import { log } from '../util/log.js';
 
 const BASE = 'https://klpbbs.com';
@@ -40,9 +41,26 @@ class KlpBbsAdapter extends SourceAdapter {
       label: '苦力怕论坛',
       site: BASE,
       types: ['map', 'datapack'],
-      notes: '国内论坛，直连可抓；搜索需登录，仅支持按板块分页浏览',
+      notes: '国内论坛，直连可抓；论坛搜索被 robots.txt 禁止，仅按板块分页浏览；配置 Cookie 可提升配额并读取登录可见内容',
     });
-    this.http = new Fetcher({ scope: 'klpbbs', minInterval: 2000, cacheTtl: 300000, retries: 2 });
+    this._cookie = null;
+    this._http = null;
+  }
+
+  /** Cookie 变化时重建抓取器 */
+  #http() {
+    const cookie = getSettings().klpbbsCookie;
+    if (!this._http || this._cookie !== cookie) {
+      this._cookie = cookie;
+      this._http = new Fetcher({
+        scope: 'klpbbs',
+        minInterval: 2000,
+        cacheTtl: 300000,
+        retries: 2,
+        headers: cookie ? { Cookie: cookie } : {},
+      });
+    }
+    return this._http;
   }
 
   /** 解析列表页 */
@@ -84,7 +102,7 @@ class KlpBbsAdapter extends SourceAdapter {
     const collected = [];
     for (const forum of targets) {
       try {
-        const html = await this.http.text(`${BASE}/forum-${forum.fid}-${pageNo}.html`, { ttl: 300000 });
+        const html = await this.#http().text(`${BASE}/forum-${forum.fid}-${pageNo}.html`, { ttl: 300000 });
         collected.push(...this.#parseList(html, forum).slice(0, quota));
       } catch (err) {
         log.warn(this.id, `板块 ${forum.label} 第 ${pageNo} 页失败：${err.message}`);
@@ -96,7 +114,7 @@ class KlpBbsAdapter extends SourceAdapter {
 
   /** 帖子详情：正文与首图 */
   async details(tid, preferredType = 'map') {
-    const html = await this.http.text(`${BASE}/thread-${tid}-1-1.html`, { ttl: 600000 });
+    const html = await this.#http().text(`${BASE}/thread-${tid}-1-1.html`, { ttl: 600000 });
     const $ = cheerio.load(html);
     const title = ($('#thread_subject').text() || $('title').text().split(' - ')[0] || '').trim();
     const post = $('td.t_f').first();

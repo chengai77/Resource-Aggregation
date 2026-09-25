@@ -15,6 +15,7 @@ const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 /** 默认设置 */
 const DEFAULTS = {
   curseforgeApiKey: '',
+  klpbbsCookie: '', // 苦力怕论坛登录 Cookie，用于关键词搜索
   browserMode: false, // 启用可见浏览器抓取 Cloudflare 站点
   requestIntervalMs: 1200, // 同源最小请求间隔
   maxItems: 50000, // 条目上限，超出淘汰最旧
@@ -64,6 +65,10 @@ export function saveSettings(patch = {}) {
 /** 对外暴露时隐去密钥明文 */
 export function maskedSettings() {
   const s = getSettings();
-  // 未配置时返回空字符串，避免设置面板把展示文案误保存成 API Key。
-  return { ...s, curseforgeApiKey: s.curseforgeApiKey ? '已配置' : '' };
+  // 未配置时返回空字符串，避免设置面板把展示文案误保存成密钥。
+  return {
+    ...s,
+    curseforgeApiKey: s.curseforgeApiKey ? '已配置' : '',
+    klpbbsCookie: s.klpbbsCookie ? '已配置' : '',
+  };
 }

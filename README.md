@@ -52,7 +52,7 @@ node cli.js selftest
 | 源 | 类型 | 接入方式 | 凭据 |
 | --- | --- | --- | --- |
 | Modrinth | 数据包 | 官方 API v2 | 不需要 |
-| 苦力怕论坛（klpbbs） | 地图、附加包 | 直连 Discuz，详情页补全 | 不需要（关键词搜索需登录 Cookie） |
+| 苦力怕论坛（klpbbs） | 地图、附加包 | 直连 Discuz，详情页补全 | 不需要，可选 Cookie |
 | Planet Minecraft | 地图、数据包 | 可见浏览器模式复用 Cookie | 人工过一次人机验证 |
 | CurseForge | 地图、数据包、整合包、资源包 | 官方 API v1 | 需要 API Key |
 
@@ -68,6 +68,7 @@ CurseForge 的 Key 需向 Overwolf 提交[申请表单](https://forms.monday.com
 | `requestIntervalMs` | `1200` | 同一站点最小请求间隔 |
 | `maxItems` | `50000` | 条目上限，超出后淘汰最旧，已编辑与收藏受保护 |
 | `curseforgeApiKey` | 空 | CurseForge API Key |
+| `klpbbsCookie` | 空 | 苦力怕论坛登录 Cookie，带上后以本人登录态抓取，配额更宽松 |
 
 ## REST API
 
@@ -123,6 +124,6 @@ data/                  运行时数据（items.json、settings.json、browser-pr
 ## 已知限制
 
 - Planet Minecraft 首次采集需要人工过一次人机验证，Cookie 失效后需重新验证
-- 苦力怕论坛的关键词搜索需登录，未提供 Cookie 时只能按板块翻页
+- 苦力怕论坛的 `/search.php` 被其 robots.txt 明确禁止抓取，因此不提供站内关键词搜索：按板块翻页采集入库后，用本工具前端的本地搜索即可
 - CurseForge 未配置 API Key 时该源会被跳过
 - 苦力怕论坛部分帖子未上传图片，这类条目的封面为空属正常情况

@@ -107,8 +107,9 @@ export function createRouter() {
 
   router.post('/settings', (req, res) => {
     const patch = { ...(req.body || {}) };
-    if (patch.curseforgeApiKey === '已配置' || patch.curseforgeApiKey === '未配置' || patch.curseforgeApiKey === '') {
-      delete patch.curseforgeApiKey; // 空值与展示占位值均表示保留原密钥
+    // 空值与展示占位值均表示保留原凭据
+    for (const key of ['curseforgeApiKey', 'klpbbsCookie']) {
+      if (patch[key] === undefined || patch[key] === '' || patch[key] === '已配置' || patch[key] === '未配置') delete patch[key];
     }
     saveSettings(patch);
     res.json(maskedSettings());
