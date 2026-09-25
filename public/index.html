@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MC 资源聚合</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="brand-mark"></span>MC 资源聚合</div>
+  <div class="search-wrap">
+    <input id="search" type="search" placeholder="搜索标题 / 概述 / 作者" autocomplete="off">
+  </div>
+  <select id="sort" title="排序">
+    <option value="collected">默认</option>
+    <option value="relevance">热度优先</option>
+    <option value="downloads">下载量</option>
+    <option value="follows">关注数</option>
+    <option value="latest">最新发布</option>
+    <option value="updated">最近更新</option>
+    <option value="title">标题</option>
+  </select>
+  <button id="btn-collect" class="btn primary">采集</button>
+  <button id="btn-settings" class="btn">设置</button>
+</header>
+
+<main class="layout">
+  <aside class="filters" id="filters">
+    <section class="filter-block">
+      <h3>类型</h3>
+      <div class="chips" data-facet="type"></div>
+    </section>
+    <section class="filter-block">
+      <h3>来源</h3>
+      <div class="chips" data-facet="source"></div>
+    </section>
+    <section class="filter-block">
+      <h3>分类</h3>
+      <div class="chips scroll" data-facet="category"></div>
+    </section>
+    <section class="filter-block">
+      <h3>版本</h3>
+      <div class="chips scroll" data-facet="version"></div>
+    </section>
+    <section class="filter-block">
+      <h3>状态</h3>
+      <div class="chips">
+        <button class="chip" data-toggle="favorite">收藏</button>
+        <button class="chip" data-toggle="edited">已编辑</button>
+        <button class="chip" data-toggle="dupOnly">重复项</button>
+      </div>
+    </section>
+    <section class="filter-block stats" id="stats"></section>
+    <section class="filter-block">
+      <button id="btn-reset-filters" class="btn small">重置筛选</button>
+    </section>
+  </aside>
+
+  <section class="results">
+    <div class="toolbar">
+      <span id="result-count" class="count">—</span>
+      <div class="toolbar-right">
+        <button id="btn-dedupe" class="btn small">去重</button>
+        <button id="btn-export-md" class="btn small">导出 MD</button>
+        <button id="btn-export-csv" class="btn small">导出 CSV</button>
+        <button id="btn-export-json" class="btn small">导出 JSON</button>
+      </div>
+    </div>
+    <div id="cards" class="cards"></div>
+    <div id="pager" class="pager"></div>
+  </section>
+</main>
+
+<aside id="drawer" class="drawer" hidden>
+  <div class="drawer-head">
+    <span id="drawer-source" class="tag"></span>
+    <div class="drawer-actions">
+      <button id="drawer-refresh" class="btn small" title="重新抓取">刷新</button>
+      <button id="drawer-close" class="btn small">关闭</button>
+    </div>
+  </div>
+  <div id="drawer-body" class="drawer-body"></div>
+</aside>
+
+<div id="modal-layer" class="modal-layer" hidden>
+  <div class="modal" id="modal">
+    <div class="modal-head"><h2 id="modal-title">标题</h2><button id="modal-close" class="btn small">关闭</button></div>
+    <div id="modal-body" class="modal-body"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>

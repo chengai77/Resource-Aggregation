@@ -1,0 +1,21 @@
+# 依赖
+node_modules/
+
+# 运行时数据（库存、设置中的密钥、含 Cookie 的浏览器配置）
+data/
+
+# 自测临时目录
+.selftest-data/
+
+# 本地工具目录
+.workbuddy/
+
+# 环境变量与密钥
+.env
+.env.local
+
+# 日志与系统文件
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

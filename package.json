@@ -1,0 +1,22 @@
+{
+  "name": "mc-resource-hub",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minecraft 地图与数据包资源聚合抓取工具",
+  "type": "module",
+  "main": "server.js",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "collect": "node cli.js collect",
+    "selftest": "node cli.js selftest"
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "express": "^4.21.2",
+    "playwright": "^1.63.0"
+  }
+}

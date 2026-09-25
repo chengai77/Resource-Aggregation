@@ -1,0 +1,81 @@
+========================================
+MC 资源聚合工具 —— 交付上下文
+========================================
+
+【项目定位】
+抓取国内外 Minecraft 地图 / 数据包资源，统一入库，供前端可视化查看、编辑、跳转原站。
+每条数据包含：来源链接、封面、内容概述、玩法简介。
+
+【技术栈】
+Node.js 20+ / ESM，Express 4，cheerio 解析，playwright 处理带人机验证的站点；前端零构建原生 ES module。
+
+【启动与常用命令】
+npm install                     # 安装依赖（playwright 建议国内镜像）
+node server.js                  # 启动服务 http://127.0.0.1:5178
+npm run dev                     # 带 --watch 的开发模式
+node cli.js collect --source=klpbbs --type=map --pages=1 --limit=20
+node cli.js stats               # 库存统计
+node cli.js export --format=csv # 导出数据
+node cli.js selftest            # 端到端自测（用 .selftest-data 独立目录）
+
+【目录结构】
+server.js                 启动入口
+cli.js                    命令行：collect / stats / export / selftest
+src/config.js             配置常量与可持久化设置（data/settings.json）
+src/collector.js          采集编排：逐源 search → enrich 补全 → 入库 → 去重
+src/sources/              base（条目模型与适配器基类）、modrinth、klpbbs、planetminecraft、curseforge、index（注册表）
+src/store/                store（内存 Map + JSON 原子写）、dedupe（倒排索引近似去重）
+src/server/               app（静态与错误出口）、routes（REST API）、query（筛选排序分页）、export（CSV/Markdown）
+src/util/                 http（限速+重试+TtlCache）、robots、browser（可见浏览器抓取）、richtext、text、cache、log
+public/                   index.html + css/style.css + js/（api、ui、state、filters、cards、detail、collect、app）
+data/items.json           资源库存（原子写，节流落盘）
+
+【REST API】
+GET  /api/items            列表（q/type/source/category/version/sort/page/limit/dup/favorite/edited）
+GET  /api/items/:uid       详情（含概述、玩法、图集全文）
+PATCH /api/items/:uid      编辑（title/summary/gameplay/tags/categories/url/cover/note/favorite）
+POST /api/items/:uid/reset 还原原值
+DELETE /api/items/:uid     删除条目
+POST /api/collect          发起采集（sources/type/query/pages/limit/enrich/dedupe）
+GET  /api/collect/status   采集进度
+GET  /api/facets           筛选统计
+GET  /api/sources          数据源状态
+GET  /api/export           导出（format=csv|md|json）
+GET/PATCH /api/settings    读取/保存设置（CurseForge Key、请求间隔、库存上限、浏览器模式）
+GET  /api/logs             运行日志
+POST /api/dedupe           手动重跑去重
+POST /api/refresh/:uid      重新抓取单条
+
+【数据源状态】
+modrinth        已跑通。官方 API v2 免 Key，datapack 用 facets 过滤，批量 /v2/projects?ids= 补全。40 条实测字段填充 100%。
+klpbbs          已跑通。Discuz X3.4，直连可抓；板块 fid 139（JE地图）/51（BE地图）/52（BE附加包）。
+                列表页无概述与封面，已实现 enrich() 逐条进详情补全（正文、首图、图集）；search 按板块均分配额，
+                避免 limit 截断导致后置板块（BE）被整体丢弃。
+planetminecraft 待校准。Cloudflare Turnstile 托管校验，直连 403；已实现浏览器模式（可见窗口 + 持久化 profile 复用 Cookie），
+                但需用户手动过一次验证后才能抓到真实 HTML，之后才能校准列表卡片解析（下载量/点赞数字段为保守推断）。
+curseforge      预留。需要 API Key，在「设置」中填写后自动启用（CLASS_IDS: map=17, datapack=6945）。
+
+【合规边界（重要）】
+不破解验证码、不做浏览器指纹伪装、不使用代理池规避 WAF。
+仅采用：官方 API 优先 → 直连（限速 + 遵守 robots.txt + 遵从 Retry-After）→ 必要时可见浏览器由用户手动完成一次校验，Cookie 复用。
+
+【关键设计】
+- 适配器模式：新增站点只需实现 search/details（enrich、taxonomy 可选），业务层不感知站点差异。
+- 条目模型：makeItem() 统一 uid = source:sourceId，summary = 内容概述，gameplay = 玩法简介。
+- 存储：内存 Map + 写临时文件后 rename 的原子落盘，1500ms 节流；超上限淘汰最旧，保护已编辑与收藏。
+- 去重：精确键（canonicalUrl/canonicalKey）+ bigram Dice ≥ 0.86 近似（并查集分组，候选上限 240）。
+- 前端：列表接口只返回轻量字段，正文/图集走详情接口；静态资源带 no-cache 强制协商缓存，改前端必刷新生效。
+
+【待办】
+1. PlanetMinecraft 校准：在「设置」中开启浏览器模式 → 采集一次 PMC → 在弹出窗口点一次验证 → 用真实 HTML 校准
+   src/sources/planetminecraft.js 的 #parseList（当前 stats 取前两个数字为 downloads/likes 属保守假设）与 details 选择器。
+2. CurseForge：拿到 API Key 后实测一次（适配器已写好，未跑过真实请求）。
+3. 如需扩充国内源，按 klpbbs 适配器模板新增即可。
+
+【已完成的验证】
+- 自测 8/8 通过（Modrinth 搜索/详情/补全、klpbbs 列表与详情与补全、跨源去重、查询排序、编辑与还原、CSV/Markdown 导出）。
+- 浏览器实测前端全流程通过：卡片渲染、抽屉初始隐藏、点击卡片打开详情（封面/外链/概述/玩法/图集/字段）、
+  编辑玩法简介并持久化、还原原值、来源与类型筛选计数与后端一致、无应用层 console 报错。
+- 库存现状：80 条（modrinth 40 条数据包 + klpbbs 40 条：JE地图 20、BE地图 10、BE附加包 10）。
+  Modrinth 封面/概述/玩法/链接填充 100%；klpbbs 链接 100%、概述约 97%、玩法约 90%、
+  封面约 40%（未填充的是原帖确实未上传图片，非解析失败）。
