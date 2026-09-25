@@ -1,0 +1,128 @@
+# MC 资源聚合
+
+抓取国内外 Minecraft 地图与数据包资源，统一入库，通过前端可视化查看、编辑并跳转原站。
+
+每条资源都包含：来源链接、封面、内容概述、玩法简介、图集、版本与分类。
+
+## 特性
+
+- 多源适配：新增站点只需实现 `search` 与 `details`，业务层不感知站点差异
+- 字段补全：列表页缺概述与封面的站点会逐条进详情页补全
+- 跨源去重：精确键（规范化 URL）+ 近似匹配（标题 bigram Dice ≥ 0.86，并查集分组）
+- 可视化前端：卡片流、多维筛选、详情抽屉、外链跳转、可编辑可还原
+- 导出：CSV / Markdown / JSON
+- 采集纪律：同源限速、指数退避重试、遵从 `Retry-After`、遵守 robots.txt
+
+## 环境要求
+
+- Node.js 18 或更高版本
+- 可选：Playwright Chromium（仅在使用浏览器抓取模式时需要）
+
+## 快速开始
+
+```bash
+npm install
+npm start
+```
+
+打开 `http://127.0.0.1:5178`，在「采集」面板选择数据源与类型后开始抓取。
+
+安装浏览器抓取所需的 Chromium（国内网络建议走镜像）：
+
+```bash
+set PLAYWRIGHT_DOWNLOAD_HOST=https://cdn.npmmirror.com/binaries/playwright
+npx playwright install chromium
+```
+
+## 命令行
+
+```bash
+node cli.js collect --source=klpbbs --type=map --pages=1 --limit=20
+node cli.js stats
+node cli.js export --format=csv --out=out.csv
+node cli.js selftest
+```
+
+`collect` 支持的参数：`--source`（逗号分隔多个源）、`--type`、`--query`、`--sort`、`--category`、`--version`、`--pages`、`--limit`、`--enrich=false`、`--dedupe=false`。
+
+`selftest` 使用独立数据目录，覆盖抓取、字段、去重、查询、编辑与导出。
+
+## 数据源
+
+| 源 | 类型 | 接入方式 | 凭据 |
+| --- | --- | --- | --- |
+| Modrinth | 数据包 | 官方 API v2 | 不需要 |
+| 苦力怕论坛（klpbbs） | 地图、附加包 | 直连 Discuz，详情页补全 | 不需要（关键词搜索需登录 Cookie） |
+| Planet Minecraft | 地图、数据包 | 可见浏览器模式复用 Cookie | 人工过一次人机验证 |
+| CurseForge | 地图、数据包、整合包、资源包 | 官方 API v1 | 需要 API Key |
+
+Planet Minecraft 受 Cloudflare 托管校验保护，首次使用需在「设置」中开启浏览器抓取模式，弹出的窗口里手动完成一次验证，之后的请求复用该 Cookie。
+
+CurseForge 的 Key 需向 Overwolf 提交[申请表单](https://forms.monday.com/forms/dce5ccb7afda9a1c21dab1a1aa1d84eb?r=use1)获取，通过后填入「设置」即自动启用。
+
+## 设置项
+
+| 配置 | 默认值 | 说明 |
+| --- | --- | --- |
+| `browserMode` | `false` | 启用可见浏览器抓取需校验的站点 |
+| `requestIntervalMs` | `1200` | 同一站点最小请求间隔 |
+| `maxItems` | `50000` | 条目上限，超出后淘汰最旧，已编辑与收藏受保护 |
+| `curseforgeApiKey` | 空 | CurseForge API Key |
+
+## REST API
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/health` | 服务状态与库存量 |
+| GET | `/api/sources` | 各源就绪状态 |
+| GET | `/api/items` | 列表，支持 `q` `type` `source` `category` `version` `tag` `sort` `page` `limit` `dup` `favorite` `edited` |
+| GET | `/api/items/:uid` | 详情，含概述、玩法、图集全文 |
+| PATCH | `/api/items/:uid` | 编辑条目 |
+| POST | `/api/items/:uid/reset` | 还原为原始抓取数据 |
+| POST | `/api/items/:uid/refresh` | 从源站重新拉取 |
+| DELETE | `/api/items/:uid` | 删除条目 |
+| POST | `/api/collect` | 发起采集（后台执行） |
+| GET | `/api/collect/status` | 采集进度 |
+| GET | `/api/facets` | 筛选统计 |
+| POST | `/api/dedupe` | 手动重跑去重 |
+| GET | `/api/export` | 导出，`format=csv\|md\|json` |
+| GET/POST | `/api/settings` | 读取或保存设置 |
+| GET | `/api/logs` | 运行日志 |
+
+## 目录结构
+
+```
+server.js              服务入口
+cli.js                 命令行：collect / stats / export / selftest
+src/
+  config.js            路径、端口与可持久化设置
+  collector.js         采集编排：逐源 search → enrich → 入库 → 去重
+  sources/             源适配器（base、modrinth、klpbbs、planetminecraft、curseforge）
+  store/               store 存储与 dedupe 去重
+  server/              app 静态与错误出口、routes 路由、query 查询、export 导出
+  util/                http 限速重试缓存、robots、browser 浏览器抓取、richtext、log
+public/                前端：index.html、css、js（api、ui、state、filters、cards、detail、collect、app）
+data/                  运行时数据（items.json、settings.json、browser-profile）
+```
+
+## 设计要点
+
+- **适配器模式**：抽象基类只要求 `search` 与 `details`，`enrich` 与 `taxonomy` 按需实现，接口隔离
+- **存储**：内存索引 + 写临时文件后 `rename` 的原子落盘，1500ms 节流；上限淘汰保护用户编辑与收藏
+- **去重**：先按规范化 URL 精确匹配，再用倒排索引 + bigram Dice 近似匹配，候选规模受限以控制开销
+- **前端**：零构建原生 ES module；列表接口只返回轻量字段，正文与图集走详情接口
+
+## 合规说明
+
+本项目不破解验证码、不做浏览器指纹伪装、不使用代理池规避 WAF。
+
+采集策略为：官方 API 优先 → 直连（限速、遵守 robots.txt、遵从 `Retry-After`）→ 必要时由使用者在可见浏览器中手动完成一次校验并复用 Cookie。
+
+请遵守各站点的服务条款与内容授权，仅将抓取结果用于个人查阅，不要重新分发资源文件本身。
+
+## 已知限制
+
+- Planet Minecraft 首次采集需要人工过一次人机验证，Cookie 失效后需重新验证
+- 苦力怕论坛的关键词搜索需登录，未提供 Cookie 时只能按板块翻页
+- CurseForge 未配置 API Key 时该源会被跳过
+- 苦力怕论坛部分帖子未上传图片，这类条目的封面为空属正常情况
